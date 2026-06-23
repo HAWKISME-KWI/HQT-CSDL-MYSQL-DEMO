@@ -28,5 +28,5 @@ t1.join()
 t2.join()
 
 print("\n=== KẾT THÚC ===")
-print(f"👉 Kiểm tra trạng thái booking {BOOKING_ID} trong DB.")
-print("👉 Nếu cả hai đều thành công và trạng thái cuối cùng là của thằng chạy sau => Lost Update xảy ra.")
+print(f"Kiểm tra trạng thái booking {BOOKING_ID} trong DB.")
+print(f"Nếu cả hai đều thành công và trạng thái cuối cùng là của thằng chạy sau => Lost Update xảy ra.")
