@@ -2,17 +2,21 @@ import pymysql
 import datetime
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(os.path.dirname(current_dir))
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
 from config.db import get_mysql_connection
-COURT_ID = "some_court_id"
-USER_ID = "some_user_id"   
+COURT_ID = "09607ce3-6f22-11f1-b688-0ade6101e0c7"
+USER_ID = "22665ae3-6ed6-11f1-b688-0ade6101e0c7"   
 TODAY = datetime.date.today()
-START_TIME = datetime.datetime(TODAY.year, TODAY.month, TODAY.day, 10, 0, 0)
-END_TIME = datetime.datetime(TODAY.year, TODAY.month, TODAY.day, 11, 0, 0)
+START_TIME = datetime.datetime(TODAY.year, TODAY.month, TODAY.day, 15, 0, 0)
+END_TIME = datetime.datetime(TODAY.year, TODAY.month, TODAY.day, 16, 0, 0)
 def phantom_read_demo():
     conn_a = get_mysql_connection()
     conn_a.autocommit(False)
     cur_a = conn_a.cursor()
+    cur_a.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
     conn_b = get_mysql_connection()
     conn_b.autocommit(False)
     cur_b = conn_b.cursor()

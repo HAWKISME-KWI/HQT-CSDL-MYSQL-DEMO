@@ -467,8 +467,9 @@ class CourtManagerApp:
             messagebox.showerror("Lỗi", "Thời gian kết thúc phải sau bắt đầu")
             return
 
-        start_utc = (start_dt - datetime.timedelta(hours=7)).isoformat() + 'Z'
-        end_utc = (end_dt - datetime.timedelta(hours=7)).isoformat() + 'Z'
+        # Chuyển sang UTC và định dạng MySQL (không có 'Z')
+        start_utc = (start_dt - datetime.timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
+        end_utc = (end_dt - datetime.timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
         res = db_service.calculate_cost(self.selected_court_id, start_utc, end_utc)
         if "data" in res:
             self.label_cost.config(text=f"{res['data']} VND")
@@ -489,8 +490,9 @@ class CourtManagerApp:
             messagebox.showerror("Lỗi", "Không thể đặt trong quá khứ")
             return
 
-        start_utc = (start_dt - datetime.timedelta(hours=7)).isoformat() + 'Z'
-        end_utc = (end_dt - datetime.timedelta(hours=7)).isoformat() + 'Z'
+        # Chuyển sang UTC và định dạng MySQL (không có 'Z')
+        start_utc = (start_dt - datetime.timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
+        end_utc = (end_dt - datetime.timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
 
         if not messagebox.askyesno("Xác nhận", f"Đặt sân từ {start_dt.strftime('%H:%M')} đến {end_dt.strftime('%H:%M')}? Chi phí: {self.label_cost.cget('text')}"):
             return

@@ -5,6 +5,7 @@ import bcrypt
 import datetime
 import io
 import time
+import uuid
 from PIL import Image
 import pymysql
 import sys
@@ -16,7 +17,6 @@ if parent_dir not in sys.path:
 from config.db import get_mysql_connection, supabase_storage
 load_dotenv()
 
-# ================== AUTHENTICATION ==================
 def register(username, password, phone_number, role='CUSTOMER'):
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     conn = get_mysql_connection()
@@ -54,7 +54,6 @@ def login(username, password):
     finally:
         conn.close()
 
-# ================== BOOKING ==================
 def book_court(user_id, court_id, start_time, end_time):
     conn = get_mysql_connection()
     try:
@@ -126,8 +125,6 @@ def reject_booking(booking_id, admin_id):
         return {"error": str(e)}
     finally:
         conn.close()
-
-# ================== COURT MANAGEMENT ==================
 def upload_court_image(file_path, court_id):
     try:
         img = Image.open(file_path)
@@ -137,41 +134,50 @@ def upload_court_image(file_path, court_id):
         buffer = io.BytesIO()
         img.save(buffer, format='JPEG', quality=85)
         buffer.seek(0)
+        unique_id = uuid.uuid4().hex[:8]
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        file_name = f"court_{court_id}_{timestamp}.jpg"
+        file_name = f"court_{court_id}_{timestamp}_{unique_id}.jpg"
         res = supabase_storage.storage.from_("court_images").upload(
             file_name,
             buffer.getvalue(),
             {"content-type": "image/jpeg"}
         )
         if hasattr(res, 'error') and res.error:
-            return {"error": res.error}
+            return {"error": str(res.error)}
         public_url = supabase_storage.storage.from_("court_images").get_public_url(file_name)
         return {"success": True, "url": public_url}
     except Exception as e:
         return {"error": str(e)}
 
 def add_court(court_name, address, surface, size, price_hour, price_3h, image_path, admin_id):
+    """
+    Thêm sân mới. Với MANAGER: owner_id = NULL; với COURT_MANAGER: owner_id = admin_id.
+    Sử dụng OUT parameter của stored procedure để lấy court_id chính xác.
+    """
     try:
         if price_3h <= price_hour:
             return {"error": "3-hour price must be greater than 1-hour price"}
         conn = get_mysql_connection()
         try:
             with conn.cursor() as cur:
-                cur.callproc('sp_add_court', (court_name, address, surface, size, price_hour, price_3h, admin_id, None, None))
-                cur.execute("SELECT court_id FROM courts WHERE owner_id = %s ORDER BY created_at DESC LIMIT 1", (admin_id,))
-                row = cur.fetchone()
-                if not row:
-                    return {"error": "Không thể lấy court_id"}
-                court_id = row['court_id']
+                result = cur.callproc(
+                    'sp_add_court',
+                    (court_name, address, surface, size, price_hour, price_3h, admin_id, None, None)
+                )
                 conn.commit()
+                court_id = result[8]
+                if not court_id:
+                    return {"error": "Không thể lấy court_id từ stored procedure"}
                 if image_path:
                     upload_result = upload_court_image(image_path, court_id)
                     if upload_result.get("error"):
-                        return {"error": upload_result["error"]}
+                        cur.execute("DELETE FROM courts WHERE court_id = %s", (court_id,))
+                        conn.commit()
+                        return {"error": f"Upload ảnh thất bại: {upload_result['error']}"}
                     image_url = upload_result["url"]
                     cur.execute("UPDATE courts SET image_url = %s WHERE court_id = %s", (image_url, court_id))
                     conn.commit()
+
                 return {"success": True, "court_id": court_id}
         except pymysql.MySQLError as e:
             return {"error": str(e)}
@@ -203,10 +209,7 @@ def delete_court(court_id, admin_id):
         return {"error": str(e)}
     finally:
         conn.close()
-
-# ================== VIEWS & QUERIES (gọi PROCEDURE thay vì RPC) ==================
 def get_available_courts():
-    # vẫn dùng view
     conn = get_mysql_connection()
     try:
         with conn.cursor() as cur:
@@ -237,7 +240,6 @@ def get_all_bookings(owner_id=None):
     return search_bookings(owner_id=owner_id)
 
 def calculate_cost(court_id, start_time, end_time):
-    # Hàm scalar
     conn = get_mysql_connection()
     try:
         with conn.cursor() as cur:
@@ -254,7 +256,6 @@ def search_bookings(user_id=None, from_date=None, to_date=None, status=None, cou
     try:
         with conn.cursor() as cur:
             cur.callproc('sp_search_bookings', (user_id, from_date, to_date, status, court_id, owner_id))
-            # Kết quả trả về là result set, fetchall
             data = cur.fetchall()
             return {"success": True, "data": data}
     except pymysql.MySQLError as e:

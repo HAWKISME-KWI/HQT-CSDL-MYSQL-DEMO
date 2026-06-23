@@ -5,9 +5,9 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from service import db_service
 
-BOOKING_ID = "3e5e7d73-249a-4aa6-8b8f-3e2fc21120b8"   # Booking đang ở trạng thái PENDING
-ADMIN_APPROVE = "0ae283a8-4c99-456e-a173-184b82e6cc7d"              # Admin có quyền approve
-ADMIN_REJECT = "90de4438-ad37-4215-ac07-2e99737920b3"               # Admin có quyền reject (có thể khác hoặc cùng)
+BOOKING_ID = "2e6063e2-6f22-11f1-b688-0ade6101e0c7"   # Booking đang ở trạng thái PENDING
+ADMIN_APPROVE = "22665ae3-6ed6-11f1-b688-0ade6101e0c7"              # Admin có quyền approve
+ADMIN_REJECT = "f8535db9-6f13-11f1-b688-0ade6101e0c7"               # Admin có quyền reject (có thể khác hoặc cùng)
 
 
 def approve():
