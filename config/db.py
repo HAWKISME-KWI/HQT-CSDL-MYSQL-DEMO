@@ -9,6 +9,7 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase_storage = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 # Mysql Aiven
 MYSQL_HOST = os.getenv("MYSQL_HOST")
 MYSQL_PORT = int(os.getenv("MYSQL_PORT", 3306))

@@ -5,8 +5,8 @@ DELIMITER //
 
 CREATE FUNCTION fn_calculate_booking_cost(
     p_court_id CHAR(36),
-    p_start_time TIMESTAMP,
-    p_end_time TIMESTAMP
+    p_start_time DATETIME,
+    p_end_time DATETIME
 )
 RETURNS DECIMAL(10,2)
 DETERMINISTIC
@@ -34,8 +34,8 @@ END //
 
 CREATE FUNCTION fn_is_court_available(
     p_court_id CHAR(36),
-    p_start TIMESTAMP,
-    p_end TIMESTAMP
+    p_start DATETIME,
+    p_end DATETIME
 )
 RETURNS BOOLEAN
 DETERMINISTIC

@@ -16,8 +16,8 @@ DROP PROCEDURE IF EXISTS sp_delete_court;
 DELIMITER //
 CREATE PROCEDURE sp_search_bookings(
     IN p_user_id CHAR(36),
-    IN p_from_date TIMESTAMP,
-    IN p_to_date TIMESTAMP,
+    IN p_from_date DATETIME,
+    IN p_to_date DATETIME,
     IN p_status VARCHAR(20),
     IN p_court_id CHAR(36),
     IN p_owner_id CHAR(36)
@@ -43,6 +43,23 @@ BEGIN
         AND (p_court_id IS NULL OR b.court_id = p_court_id)
         AND (p_owner_id IS NULL OR c.owner_id = p_owner_id)
     ORDER BY b.start_time DESC;
+END //
+
+CREATE PROCEDURE sp_book_court(
+    IN p_user_id CHAR(36),
+    IN p_court_id CHAR(36),
+    IN p_start DATETIME,
+    IN p_end DATETIME
+)
+MODIFIES SQL DATA
+BEGIN
+    DECLARE v_available BOOLEAN;
+    SET v_available = fn_is_court_available(p_court_id, p_start, p_end);
+    IF NOT v_available THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Court is already booked';
+    END IF;
+    INSERT INTO bookings(user_id, court_id, start_time, end_time, status)
+    VALUES (p_user_id, p_court_id, p_start, p_end, 'PENDING');
 END //
 CREATE PROCEDURE sp_filter_courts(
     IN p_surface VARCHAR(20),
@@ -138,51 +155,6 @@ BEGIN
     GROUP BY c.court_id, c.court_name, c.address, u.phone_number
     ORDER BY total_bookings DESC
     LIMIT limit_count;
-END //
-CREATE PROCEDURE sp_book_court(
-    IN p_user_id CHAR(36),
-    IN p_court_id CHAR(36),
-    IN p_start TIMESTAMP,
-    IN p_end TIMESTAMP
-)
-MODIFIES SQL DATA
-BEGIN
-    DECLARE v_available BOOLEAN;
-    SET v_available = fn_is_court_available(p_court_id, p_start, p_end);
-    IF NOT v_available THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Court is already booked';
-    END IF;
-    INSERT INTO bookings(user_id, court_id, start_time, end_time, status)
-    VALUES (p_user_id, p_court_id, p_start, p_end, 'PENDING');
-END //
-CREATE PROCEDURE sp_approve_booking(
-    IN p_booking_id CHAR(36),
-    IN p_admin_id CHAR(36)
-)
-MODIFIES SQL DATA
-BEGIN
-    DECLARE v_role VARCHAR(20);
-    DECLARE v_court_owner CHAR(36);
-
-    SELECT role INTO v_role FROM users WHERE user_id = p_admin_id;
-    IF v_role NOT IN ('MANAGER', 'COURT_MANAGER') THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Only managers or court managers can approve bookings';
-    END IF;
-
-    IF v_role = 'COURT_MANAGER' THEN
-        SELECT c.owner_id INTO v_court_owner
-        FROM bookings b
-        JOIN courts c ON b.court_id = c.court_id
-        WHERE b.booking_id = p_booking_id;
-        IF v_court_owner != p_admin_id THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'You are not the owner of this court';
-        END IF;
-    END IF;
-
-    UPDATE bookings SET status = 'BOOKED' WHERE booking_id = p_booking_id AND status = 'PENDING';
-    IF ROW_COUNT() = 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Booking not found or not pending';
-    END IF;
 END //
 CREATE PROCEDURE sp_reject_booking(
     IN p_booking_id CHAR(36),

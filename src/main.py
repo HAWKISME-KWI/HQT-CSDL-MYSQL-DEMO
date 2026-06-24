@@ -14,9 +14,10 @@ from service import db_service
 def format_datetime(dt_str):
     if dt_str:
         try:
+            # Parse chuỗi ISO (có thể có Z)
             dt = datetime.datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
-            dt_local = dt + datetime.timedelta(hours=7)
-            return dt_local.strftime("%d/%m/%Y %H:%M")
+            # Không cộng thêm gì, hiển thị trực tiếp (vì đã lưu giờ địa phương)
+            return dt.strftime("%d/%m/%Y %H:%M")
         except:
             return dt_str
     return ""
@@ -31,13 +32,10 @@ class CourtManagerApp:
         style = ttk.Style()
         style.theme_use('clam')
         
-        # Configure global background
         self.root.configure(bg='#F4FDF4')
         
-        # Configure default font for all ttk widgets
         default_font = ('Segoe UI', 10)
         
-        # Global Light Green & Black Borders styling
         style.configure('.', font=default_font, background='#F4FDF4', foreground='#000000', bordercolor='#000000')
         style.configure('TFrame', background='#F4FDF4')
         style.configure('TNotebook', background='#F4FDF4')
@@ -48,32 +46,25 @@ class CourtManagerApp:
         style.configure('TLabelFrame', background='#F4FDF4', bordercolor='#000000')
         style.configure('TLabelframe.Label', background='#F4FDF4', font=('Segoe UI', 10, 'bold'), foreground='#28a745')
         
-        # Button styling (Default Blue)
         style.configure('TButton', font=('Segoe UI', 10, 'bold'), background='#007BFF', foreground='#FFFFFF', padding=5, bordercolor='#000000')
         style.map('TButton', background=[('active', '#0056b3')], foreground=[('active', '#FFFFFF')])
         
-        # Treeview Styling
         style.configure('Treeview.Heading', font=('Segoe UI', 10, 'bold'), background='#E8F5E9', foreground='#000000', bordercolor='#000000')
         style.configure('Treeview', rowheight=25, background='#FFFFFF', fieldbackground='#FFFFFF', bordercolor='#000000')
         style.map('Treeview', background=[('selected', '#d4edda')], foreground=[('selected', '#155724')])
         
-        # Custom styles for specific elements
         style.configure('Header.TLabel', font=('Segoe UI', 20, 'bold'), foreground='#28a745', background='#F4FDF4')
         style.configure('SubHeader.TLabel', font=('Segoe UI', 14, 'bold'), foreground='#28a745', background='#F4FDF4')
         
-        # Success Button (Green)
         style.configure('Success.TButton', background='#28a745', foreground='#FFFFFF')
         style.map('Success.TButton', background=[('active', '#218838')])
         
-        # Danger Button (Red)
         style.configure('Danger.TButton', background='#dc3545', foreground='#FFFFFF')
         style.map('Danger.TButton', background=[('active', '#c82333')])
         
-        # Warning Button (Orange)
         style.configure('Warning.TButton', background='#fd7e14', foreground='#FFFFFF')
         style.map('Warning.TButton', background=[('active', '#e8590c')])
         
-        # Info Button (Cyan/Teal)
         style.configure('Info.TButton', background='#17a2b8', foreground='#FFFFFF')
         style.map('Info.TButton', background=[('active', '#138496')])
 
@@ -103,7 +94,6 @@ class CourtManagerApp:
         for widget in self.login_frame.winfo_children():
             widget.destroy()
             
-        # Center card
         card = ttk.Frame(self.login_frame, padding=40)
         card.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
         
@@ -213,11 +203,9 @@ class CourtManagerApp:
 
     # ================== TAB 1: SÂN ==================
     def build_courts_tab(self):
-        # Vertical split: Top = List, Bottom = Details + Booking
         main_pane = ttk.PanedWindow(self.tab_courts, orient='vertical')
         main_pane.pack(fill='both', expand=True, padx=10, pady=10)
 
-        # TOP FRAME (Filter + Treeview)
         top_frame = ttk.Frame(main_pane)
         main_pane.add(top_frame, weight=1)
 
@@ -252,11 +240,9 @@ class CourtManagerApp:
         scrollbar_y.pack(side='right', fill='y')
         self.tree_courts.bind("<<TreeviewSelect>>", self.on_court_selected)
 
-        # BOTTOM FRAME (Left: Details, Right: Booking)
         bottom_frame = ttk.Frame(main_pane)
         main_pane.add(bottom_frame, weight=1)
 
-        # Left split for details
         detail_frame = ttk.Frame(bottom_frame)
         detail_frame.pack(side='left', fill='both', expand=True, padx=(0, 10))
 
@@ -280,7 +266,6 @@ class CourtManagerApp:
         self.court_free_label = ttk.Label(info_frame, text="Trạng thái: ")
         self.court_free_label.pack(anchor='w', pady=2)
 
-        # Right split for booking
         booking_pane = ttk.Frame(bottom_frame)
         booking_pane.pack(side='left', fill='both', expand=True)
 
@@ -456,6 +441,7 @@ class CourtManagerApp:
         end_dt = datetime.datetime.combine(date_obj, datetime.time(end_h, end_m))
         return start_dt, end_dt
 
+    # ----- SỬA HÀM TÍNH TIỀN VÀ ĐẶT SÂN (bỏ trừ 7 giờ) -----
     def calculate_cost(self):
         if not self.selected_court_id:
             messagebox.showinfo("Thông báo", "Chọn sân trước")
@@ -467,10 +453,10 @@ class CourtManagerApp:
             messagebox.showerror("Lỗi", "Thời gian kết thúc phải sau bắt đầu")
             return
 
-        # Chuyển sang UTC và định dạng MySQL (không có 'Z')
-        start_utc = (start_dt - datetime.timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
-        end_utc = (end_dt - datetime.timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
-        res = db_service.calculate_cost(self.selected_court_id, start_utc, end_utc)
+        # Lấy chuỗi giờ địa phương (không trừ 7)
+        start_str = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+        end_str = end_dt.strftime('%Y-%m-%d %H:%M:%S')
+        res = db_service.calculate_cost(self.selected_court_id, start_str, end_str)
         if "data" in res:
             self.label_cost.config(text=f"{res['data']} VND")
         else:
@@ -490,19 +476,19 @@ class CourtManagerApp:
             messagebox.showerror("Lỗi", "Không thể đặt trong quá khứ")
             return
 
-        # Chuyển sang UTC và định dạng MySQL (không có 'Z')
-        start_utc = (start_dt - datetime.timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
-        end_utc = (end_dt - datetime.timedelta(hours=7)).strftime('%Y-%m-%d %H:%M:%S')
+        start_str = start_dt.strftime('%Y-%m-%d %H:%M:%S')
+        end_str = end_dt.strftime('%Y-%m-%d %H:%M:%S')
 
         if not messagebox.askyesno("Xác nhận", f"Đặt sân từ {start_dt.strftime('%H:%M')} đến {end_dt.strftime('%H:%M')}? Chi phí: {self.label_cost.cget('text')}"):
             return
-        res = db_service.book_court(self.current_user['user_id'], self.selected_court_id, start_utc, end_utc)
+        res = db_service.book_court(self.current_user['user_id'], self.selected_court_id, start_str, end_str)
         if "error" in res:
             messagebox.showerror("Lỗi", res["error"])
         else:
             messagebox.showinfo("Thành công", "Đặt sân thành công! Đang chờ xác nhận.")
             self.load_court_schedule()
             self.load_my_bookings()
+    # --------------------------------------------------------
 
     # ================== TAB 2: LỊCH SỬ CỦA TÔI ==================
     def build_my_bookings_tab(self):
@@ -592,24 +578,20 @@ class CourtManagerApp:
         manage_notebook.add(self.tab_manage_bookings, text="Booking")
         self.build_manage_bookings()
 
-    # ---- Quản lý sân (có thêm chức năng cập nhật) ----
+    # ---- Quản lý sân ----
     def build_manage_courts(self):
-        # Khởi tạo biến cho chế độ cập nhật
         self.editing_court_id = None
         self.current_image_url = None
 
         frame = ttk.Frame(self.tab_manage_courts)
         frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Form thêm / cập nhật sân
         form_frame = ttk.LabelFrame(frame, text="Thêm / Cập nhật sân", padding=5)
         form_frame.pack(fill=tk.X, pady=5)
 
-        # Cấu hình grid
         form_frame.columnconfigure(1, weight=1, minsize=150)
         form_frame.columnconfigure(3, weight=1, minsize=150)
 
-        # Row 0
         ttk.Label(form_frame, text="Tên sân:").grid(row=0, column=0, sticky='e', padx=(10, 5), pady=8)
         self.entry_court_name = ttk.Entry(form_frame)
         self.entry_court_name.grid(row=0, column=1, sticky='ew', padx=5, pady=8)
@@ -618,7 +600,6 @@ class CourtManagerApp:
         self.entry_address = ttk.Entry(form_frame)
         self.entry_address.grid(row=0, column=3, sticky='ew', padx=5, pady=8)
 
-        # Row 1
         ttk.Label(form_frame, text="Mặt sân:").grid(row=1, column=0, sticky='e', padx=(10, 5), pady=8)
         self.combo_surface = ttk.Combobox(form_frame, values=["PVC", "WOOD", "CEMENT", "SYNTHETIC_RESIN"])
         self.combo_surface.grid(row=1, column=1, sticky='ew', padx=5, pady=8)
@@ -627,7 +608,6 @@ class CourtManagerApp:
         self.combo_size = ttk.Combobox(form_frame, values=["SINGLE", "DOUBLE"])
         self.combo_size.grid(row=1, column=3, sticky='ew', padx=5, pady=8)
 
-        # Row 2
         ttk.Label(form_frame, text="Giá/1h (VND):").grid(row=2, column=0, sticky='e', padx=(10, 5), pady=8)
         self.entry_price_hour = ttk.Entry(form_frame)
         self.entry_price_hour.grid(row=2, column=1, sticky='ew', padx=5, pady=8)
@@ -636,7 +616,6 @@ class CourtManagerApp:
         self.entry_price_3h = ttk.Entry(form_frame)
         self.entry_price_3h.grid(row=2, column=3, sticky='ew', padx=5, pady=8)
 
-        # Row 3: Ảnh
         ttk.Label(form_frame, text="Ảnh sân:").grid(row=3, column=0, sticky='e', padx=(10, 5), pady=8)
         img_frame = ttk.Frame(form_frame)
         img_frame.grid(row=3, column=1, columnspan=3, sticky='ew', padx=5, pady=8)
@@ -646,13 +625,11 @@ class CourtManagerApp:
         self.entry_image_path.grid(row=0, column=0, sticky='ew', padx=(0, 5))
         ttk.Button(img_frame, text="Chọn ảnh", command=self.choose_image).grid(row=0, column=1)
 
-        # Row 4: Trạng thái hoạt động
         ttk.Label(form_frame, text="Trạng thái:").grid(row=4, column=0, sticky='e', padx=(10, 5), pady=8)
         self.combo_active = ttk.Combobox(form_frame, values=["Đang hoạt động", "Ngừng hoạt động"], state="readonly")
         self.combo_active.grid(row=4, column=1, sticky='w', padx=5, pady=8)
         self.combo_active.set("Đang hoạt động")
 
-        # Row 5: Các nút chức năng
         btn_frame = ttk.Frame(form_frame)
         btn_frame.grid(row=5, column=0, columnspan=4, pady=15)
 
@@ -661,17 +638,15 @@ class CourtManagerApp:
 
         self.btn_update = ttk.Button(btn_frame, text="Cập nhật", style="Warning.TButton", command=self.update_court)
         self.btn_update.pack(side='left', padx=5)
-        self.btn_update.config(state='disabled')  # Ban đầu vô hiệu
+        self.btn_update.config(state='disabled')
 
         self.btn_cancel = ttk.Button(btn_frame, text="Hủy", style="Danger.TButton", command=self.cancel_edit)
         self.btn_cancel.pack(side='left', padx=5)
         self.btn_cancel.config(state='disabled')
 
-        # Danh sách sân
         list_frame = ttk.LabelFrame(frame, text="Danh sách sân hiện có", padding=5)
         list_frame.pack(fill=tk.BOTH, expand=True, pady=10)
 
-        # Tạo Treeview với cột "Hoạt động" để hiển thị trạng thái
         self.tree_manage_courts = ttk.Treeview(list_frame, columns=("id", "name", "address", "surface", "size", "price", "active"), show="headings")
         self.tree_manage_courts.heading("id", text="ID")
         self.tree_manage_courts.heading("name", text="Tên")
@@ -688,22 +663,18 @@ class CourtManagerApp:
         self.tree_manage_courts.column("price", width=100)
         self.tree_manage_courts.column("active", width=100)
 
-        # Thanh cuộn
         scroll_y = ttk.Scrollbar(list_frame, orient='vertical', command=self.tree_manage_courts.yview)
         self.tree_manage_courts.configure(yscrollcommand=scroll_y.set)
         self.tree_manage_courts.pack(side='left', fill=tk.BOTH, expand=True)
         scroll_y.pack(side='right', fill='y')
 
-        # Sự kiện chọn dòng để load dữ liệu lên form
         self.tree_manage_courts.bind("<<TreeviewSelect>>", self.on_manage_court_selected)
 
-        # Nút chức năng cho danh sách
         btn_manage = ttk.Frame(list_frame)
         btn_manage.pack(side=tk.BOTTOM, fill=tk.X, pady=5)
         ttk.Button(btn_manage, text="Xóa (ngừng hoạt động)", style="Danger.TButton", command=self.delete_court).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_manage, text="Làm mới", style="Info.TButton", command=self.load_manage_courts).pack(side=tk.LEFT)
 
-        # Tải danh sách sân
         self.load_manage_courts()
 
     def choose_image(self):
@@ -723,7 +694,6 @@ class CourtManagerApp:
             self.tree_manage_courts.delete(item)
         if "data" in result:
             for c in result["data"]:
-                # Lấy trạng thái active từ cột is_active (nếu có)
                 is_active = c.get('is_active', True)
                 active_text = "Có" if is_active else "Không"
                 self.tree_manage_courts.insert("", tk.END, values=(
@@ -735,11 +705,9 @@ class CourtManagerApp:
                     c['price_per_hour'],
                     active_text
                 ))
-                # Lưu court_id vào map
                 self.court_id_map[str(c['court_id'])[:8]] = c['court_id']
 
     def on_manage_court_selected(self, event):
-        """Khi chọn một sân trong danh sách quản lý, load dữ liệu lên form để cập nhật"""
         sel = self.tree_manage_courts.selection()
         if not sel:
             return
@@ -750,7 +718,6 @@ class CourtManagerApp:
         self.load_court_to_form(court_id)
 
     def load_court_to_form(self, court_id):
-        """Lấy thông tin sân từ DB và điền vào form, kích hoạt chế độ cập nhật"""
         res = db_service.get_court_by_id(court_id)
         if "error" in res:
             messagebox.showerror("Lỗi", res["error"])
@@ -759,7 +726,6 @@ class CourtManagerApp:
         self.editing_court_id = court_id
         self.current_image_url = court.get('image_url')
 
-        # Điền dữ liệu vào form
         self.entry_court_name.delete(0, tk.END)
         self.entry_court_name.insert(0, court['court_name'])
         self.entry_address.delete(0, tk.END)
@@ -770,26 +736,19 @@ class CourtManagerApp:
         self.entry_price_hour.insert(0, str(court['price_per_hour']))
         self.entry_price_3h.delete(0, tk.END)
         self.entry_price_3h.insert(0, str(court.get('price_per_three_hours', 0)))
-        # Trạng thái hoạt động
         is_active = court.get('is_active', True)
         self.combo_active.set("Đang hoạt động" if is_active else "Ngừng hoạt động")
-        # Xóa đường dẫn ảnh cũ (không hiển thị)
         self.entry_image_path.delete(0, tk.END)
 
-        # Chuyển sang chế độ cập nhật
         self.btn_add.config(state='disabled')
         self.btn_update.config(state='normal')
         self.btn_cancel.config(state='normal')
-        # Đổi tiêu đề form
-        self.btn_add.master.nametowidget(self.btn_add.master.winfo_parent()).config(text="Cập nhật sân")  # Thay đổi tiêu đề LabelFrame (không được)
-        # Cách đơn giản: thay đổi text của LabelFrame
         for child in self.tab_manage_courts.winfo_children():
             if isinstance(child, ttk.LabelFrame) and child.cget("text") == "Thêm / Cập nhật sân":
                 child.config(text="Cập nhật sân")
                 break
 
     def cancel_edit(self):
-        """Hủy chế độ cập nhật, reset form"""
         self.editing_court_id = None
         self.current_image_url = None
         self.clear_form()
@@ -802,7 +761,6 @@ class CourtManagerApp:
                 break
 
     def clear_form(self):
-        """Xóa dữ liệu trên form"""
         self.entry_court_name.delete(0, tk.END)
         self.entry_address.delete(0, tk.END)
         self.combo_surface.set('')
@@ -813,7 +771,6 @@ class CourtManagerApp:
         self.combo_active.set("Đang hoạt động")
 
     def add_court(self):
-        """Thêm sân mới (chỉ hoạt động khi không ở chế độ cập nhật)"""
         name = self.entry_court_name.get().strip()
         address = self.entry_address.get().strip()
         surface = self.combo_surface.get()
@@ -842,7 +799,6 @@ class CourtManagerApp:
             self.load_courts()
 
     def update_court(self):
-        """Cập nhật thông tin sân đang được chọn"""
         if not self.editing_court_id:
             messagebox.showerror("Lỗi", "Không có sân nào đang được chọn để cập nhật")
             return
@@ -867,7 +823,6 @@ class CourtManagerApp:
             messagebox.showerror("Lỗi", "Giá phải là số")
             return
 
-        # Xử lý ảnh: nếu có đường dẫn ảnh mới thì upload, ngược lại giữ nguyên
         new_image_url = None
         if image_path:
             upload_res = db_service.upload_court_image(image_path, court_id)
@@ -876,7 +831,6 @@ class CourtManagerApp:
                 return
             new_image_url = upload_res["url"]
 
-        # Gọi hàm cập nhật
         res = db_service.update_court(
             court_id=court_id,
             court_name=name,
@@ -886,14 +840,14 @@ class CourtManagerApp:
             price_hour=price_hour,
             price_3h=price_3h,
             is_active=is_active,
-            image_url=new_image_url,  # None nếu không thay đổi ảnh
+            image_url=new_image_url,
             admin_id=self.current_user['user_id']
         )
         if "error" in res:
             messagebox.showerror("Lỗi", res["error"])
         else:
             messagebox.showinfo("Thành công", "Cập nhật sân thành công!")
-            self.cancel_edit()  # Reset form và thoát chế độ cập nhật
+            self.cancel_edit()
             self.load_manage_courts()
             self.load_courts()
 
