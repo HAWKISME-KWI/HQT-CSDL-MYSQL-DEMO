@@ -125,6 +125,7 @@ def reject_booking(booking_id, admin_id):
         return {"error": str(e)}
     finally:
         conn.close()
+
 def upload_court_image(file_path, court_id):
     try:
         img = Image.open(file_path)
@@ -148,26 +149,24 @@ def upload_court_image(file_path, court_id):
         return {"success": True, "url": public_url}
     except Exception as e:
         return {"error": str(e)}
-
 def add_court(court_name, address, surface, size, price_hour, price_3h, image_path, admin_id):
-    """
-    Thêm sân mới. Với MANAGER: owner_id = NULL; với COURT_MANAGER: owner_id = admin_id.
-    Sử dụng OUT parameter của stored procedure để lấy court_id chính xác.
-    """
     try:
         if price_3h <= price_hour:
             return {"error": "3-hour price must be greater than 1-hour price"}
         conn = get_mysql_connection()
         try:
             with conn.cursor() as cur:
-                result = cur.callproc(
+                cur.callproc(
                     'sp_add_court',
                     (court_name, address, surface, size, price_hour, price_3h, admin_id, None, None)
                 )
                 conn.commit()
-                court_id = result[8]
-                if not court_id:
+                cur.execute("SELECT @_sp_add_court_8 AS court_id")
+                row = cur.fetchone()
+                if not row or not row.get('court_id'):
                     return {"error": "Không thể lấy court_id từ stored procedure"}
+                court_id = row['court_id']
+
                 if image_path:
                     upload_result = upload_court_image(image_path, court_id)
                     if upload_result.get("error"):
@@ -185,7 +184,6 @@ def add_court(court_name, address, surface, size, price_hour, price_3h, image_pa
             conn.close()
     except Exception as e:
         return {"error": str(e)}
-
 def update_court(court_id, court_name, address, surface, size, price_hour, price_3h, is_active, image_url, admin_id):
     conn = get_mysql_connection()
     try:
@@ -209,6 +207,7 @@ def delete_court(court_id, admin_id):
         return {"error": str(e)}
     finally:
         conn.close()
+
 def get_available_courts():
     conn = get_mysql_connection()
     try:

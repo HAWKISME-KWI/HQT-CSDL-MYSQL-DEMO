@@ -14,6 +14,7 @@ DROP PROCEDURE IF EXISTS sp_update_court;
 DROP PROCEDURE IF EXISTS sp_delete_court;
 
 DELIMITER //
+
 CREATE PROCEDURE sp_search_bookings(
     IN p_user_id CHAR(36),
     IN p_from_date DATETIME,
@@ -61,6 +62,7 @@ BEGIN
     INSERT INTO bookings(user_id, court_id, start_time, end_time, status)
     VALUES (p_user_id, p_court_id, p_start, p_end, 'PENDING');
 END //
+
 CREATE PROCEDURE sp_filter_courts(
     IN p_surface VARCHAR(20),
     IN p_size VARCHAR(10),
@@ -110,6 +112,7 @@ BEGIN
             ))
         );
 END //
+
 CREATE PROCEDURE sp_get_court_schedule(
     IN p_court_id CHAR(36),
     IN p_date DATE
@@ -123,6 +126,7 @@ BEGIN
       AND b.status IN ('BOOKED', 'PENDING')
     ORDER BY b.start_time;
 END //
+
 CREATE PROCEDURE sp_daily_revenue(
     IN from_date DATE,
     IN to_date DATE,
@@ -141,6 +145,7 @@ BEGIN
     GROUP BY DATE(b.start_time)
     ORDER BY booking_date DESC;
 END //
+
 CREATE PROCEDURE sp_top_courts(
     IN limit_count INT,
     IN p_owner_id CHAR(36)
@@ -156,6 +161,37 @@ BEGIN
     ORDER BY total_bookings DESC
     LIMIT limit_count;
 END //
+
+CREATE PROCEDURE sp_approve_booking(
+    IN p_booking_id CHAR(36),
+    IN p_admin_id CHAR(36)
+)
+MODIFIES SQL DATA
+BEGIN
+    DECLARE v_role VARCHAR(20);
+    DECLARE v_court_owner CHAR(36);
+
+    SELECT role INTO v_role FROM users WHERE user_id = p_admin_id;
+    IF v_role NOT IN ('MANAGER', 'COURT_MANAGER') THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Only managers or court managers can approve bookings';
+    END IF;
+
+    IF v_role = 'COURT_MANAGER' THEN
+        SELECT c.owner_id INTO v_court_owner
+        FROM bookings b
+        JOIN courts c ON b.court_id = c.court_id
+        WHERE b.booking_id = p_booking_id;
+        IF v_court_owner != p_admin_id THEN
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'You are not the owner of this court';
+        END IF;
+    END IF;
+
+    UPDATE bookings SET status = 'BOOKED' WHERE booking_id = p_booking_id AND status = 'PENDING';
+    IF ROW_COUNT() = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Booking not found or not pending';
+    END IF;
+END //
+
 CREATE PROCEDURE sp_reject_booking(
     IN p_booking_id CHAR(36),
     IN p_admin_id CHAR(36)
@@ -185,6 +221,7 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Booking not found or not pending';
     END IF;
 END //
+
 CREATE PROCEDURE sp_cancel_booking_customer(
     IN p_booking_id CHAR(36),
     IN p_user_id CHAR(36)
@@ -211,6 +248,7 @@ BEGIN
 
     UPDATE bookings SET status = 'CANCELLED' WHERE booking_id = p_booking_id;
 END //
+
 CREATE PROCEDURE sp_cancel_booking_powerfull(
     IN p_booking_id CHAR(36),
     IN p_admin_id CHAR(36)
@@ -237,6 +275,7 @@ BEGIN
 
     UPDATE bookings SET status = 'CANCELLED' WHERE booking_id = p_booking_id;
 END //
+
 CREATE PROCEDURE sp_complete_booking(
     IN p_booking_id CHAR(36),
     IN p_admin_id CHAR(36)
@@ -278,6 +317,7 @@ MODIFIES SQL DATA
 BEGIN
     DECLARE v_role VARCHAR(20);
     DECLARE v_owner_id CHAR(36);
+    DECLARE v_court_id CHAR(36) DEFAULT UUID();
 
     SELECT role INTO v_role FROM users WHERE user_id = p_admin_id;
     IF v_role NOT IN ('MANAGER', 'COURT_MANAGER') THEN
@@ -286,17 +326,14 @@ BEGIN
 
     SET v_owner_id = IF(v_role = 'COURT_MANAGER', p_admin_id, NULL);
 
-    INSERT INTO courts (court_name, address, court_surfaces_type, court_sizes_type,
+    INSERT INTO courts (court_id, court_name, address, court_surfaces_type, court_sizes_type,
                         price_per_hour, price_per_three_hours, image_url, owner_id)
-    VALUES (p_court_name, p_address, p_surface, p_size, p_price_per_hour,
+    VALUES (v_court_id, p_court_name, p_address, p_surface, p_size, p_price_per_hour,
             p_price_per_three_hours, p_image_url, v_owner_id);
-    SELECT court_id INTO p_court_id
-    FROM courts
-    WHERE court_name = p_court_name
-      AND (owner_id = v_owner_id OR (owner_id IS NULL AND v_owner_id IS NULL))
-    ORDER BY created_at DESC
-    LIMIT 1;
+
+    SET p_court_id = v_court_id;
 END //
+
 CREATE PROCEDURE sp_update_court(
     IN p_court_id CHAR(36),
     IN p_court_name VARCHAR(255),
@@ -337,6 +374,7 @@ BEGIN
         image_url = COALESCE(p_image_url, image_url)
     WHERE court_id = p_court_id;
 END //
+
 CREATE PROCEDURE sp_delete_court(
     IN p_court_id CHAR(36),
     IN p_admin_id CHAR(36)
@@ -357,4 +395,5 @@ BEGIN
     END IF;
     UPDATE courts SET is_active = FALSE WHERE court_id = p_court_id;
 END //
+
 DELIMITER ;
